@@ -1,0 +1,102 @@
+name: 'Deploy Result Slack Notification'
+
+on:
+  workflow_call:
+    inputs:
+      webhook_url:
+        description: 'Slack Webhook URL'
+        required: true
+        type: string
+      status:
+        description: 'デプロイ結果 (success/failure/cancelled)'
+        required: true
+        type: string
+      project_name:
+        description: 'プロジェクト名'
+        required: true
+        type: string
+      environment:
+        description: 'デプロイ環境 (development/production)'
+        required: true
+        type: string
+      thread_ts:
+        description: 'Slackスレッドタイムスタンプ（開始通知のスレッドに返信）'
+        required: true
+        type: string
+      pr_title:
+        description: 'PRタイトル'
+        required: false
+        type: string
+        default: ${{ github.event.pull_request.title }}
+      pr_url:
+        description: 'PR URL'
+        required: false
+        type: string
+        default: ${{ github.event.pull_request.html_url }}
+      author:
+        description: 'デプロイ実行者'
+        required: false
+        type: string
+        default: ${{ github.actor }}
+      action_url:
+        description: '実行アクションのURL'
+        required: false
+        type: string
+        default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout slack-integration
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/slack-integration
+          path: slack-integration
+
+      - name: Generate environment and result message
+        id: result_message
+        run: |
+          case "${{ inputs.environment }}" in
+            "production")
+              env_text="本番環境"
+              ;;
+            "development")
+              env_text="開発環境"
+              ;;
+            *)
+              env_text="${{ inputs.environment }}"
+              ;;
+          esac
+
+          case "${{ inputs.status }}" in
+            "success")
+              message="✅ ${env_text}へのデプロイが完了しました！"
+              ;;
+            "failure")
+              message="❌ ${env_text}へのデプロイが失敗しました"
+              ;;
+            "cancelled")
+              message="⏹️ ${env_text}へのデプロイがキャンセルされました"
+              ;;
+            *)
+              message="📋 ${env_text}へのデプロイ: ${{ inputs.status }}"
+              ;;
+          esac
+          
+          echo "env_text=${env_text}" >> $GITHUB_OUTPUT
+          echo "message=${message}" >> $GITHUB_OUTPUT
+
+      - name: Send deploy result notification
+        uses: ./slack-integration/.github/actions/slack-notify
+        with:
+          webhook_url: ${{ inputs.webhook_url }}
+          user_id: ${{ inputs.author }}
+          project_name: '${{ inputs.project_name }} (${{ steps.result_message.outputs.env_text }})'
+          pr_title: ${{ inputs.pr_title }}
+          pr_url: ${{ inputs.pr_url }}
+          workflow_action: 'デプロイ結果'
+          action_url: ${{ inputs.action_url }}
+          message: ${{ steps.result_message.outputs.message }}
+          status: ${{ inputs.status }}
+          thread_ts: ${{ inputs.thread_ts }}
