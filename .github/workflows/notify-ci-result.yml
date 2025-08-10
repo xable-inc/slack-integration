@@ -30,10 +30,16 @@ on:
         required: false
         type: string
         default: ${{ github.event.pull_request.user.login }}
+      github_token:
+        description: 'GitHub token for API access'
+        required: false
+        type: string
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
     steps:
       - name: Checkout slack-integration
         uses: actions/checkout@v4

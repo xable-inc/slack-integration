@@ -35,6 +35,10 @@ on:
         required: false
         type: string
         default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      github_token:
+        description: 'GitHub token for API access'
+        required: false
+        type: string
     outputs:
       thread_ts:
         description: 'Slackスレッドタイムスタンプ（結果通知用）'
@@ -43,6 +47,8 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
     outputs:
       thread_ts: ${{ steps.slack_response.outputs.thread_ts }}
     steps:
