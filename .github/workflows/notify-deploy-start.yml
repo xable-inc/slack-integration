@@ -1,0 +1,92 @@
+name: 'Deploy Start Slack Notification'
+
+on:
+  workflow_call:
+    inputs:
+      webhook_url:
+        description: 'Slack Webhook URL'
+        required: true
+        type: string
+      project_name:
+        description: 'プロジェクト名'
+        required: true
+        type: string
+      environment:
+        description: 'デプロイ環境 (development/production)'
+        required: true
+        type: string
+      pr_title:
+        description: 'PRタイトル'
+        required: false
+        type: string
+        default: ${{ github.event.pull_request.title }}
+      pr_url:
+        description: 'PR URL'
+        required: false
+        type: string
+        default: ${{ github.event.pull_request.html_url }}
+      author:
+        description: 'デプロイ実行者'
+        required: false
+        type: string
+        default: ${{ github.actor }}
+      action_url:
+        description: '実行アクションのURL'
+        required: false
+        type: string
+        default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    outputs:
+      thread_ts:
+        description: 'Slackスレッドタイムスタンプ（結果通知用）'
+        value: ${{ jobs.notify.outputs.thread_ts }}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    outputs:
+      thread_ts: ${{ steps.slack_response.outputs.thread_ts }}
+    steps:
+      - name: Checkout slack-integration
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/slack-integration
+          path: slack-integration
+
+      - name: Generate environment message
+        id: env_message
+        run: |
+          case "${{ inputs.environment }}" in
+            "production")
+              echo "env_text=本番環境" >> $GITHUB_OUTPUT
+              echo "message=🚀 本番環境へのデプロイを開始します！" >> $GITHUB_OUTPUT
+              ;;
+            "development")
+              echo "env_text=開発環境" >> $GITHUB_OUTPUT
+              echo "message=🔧 開発環境へのデプロイを開始します" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "env_text=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+              echo "message=📦 ${{ inputs.environment }}環境へのデプロイを開始します" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Send deploy start notification
+        id: slack_response
+        uses: ./slack-integration/.github/actions/slack-notify
+        with:
+          webhook_url: ${{ inputs.webhook_url }}
+          user_id: ${{ inputs.author }}
+          project_name: '${{ inputs.project_name }} (${{ steps.env_message.outputs.env_text }})'
+          pr_title: ${{ inputs.pr_title }}
+          pr_url: ${{ inputs.pr_url }}
+          workflow_action: 'デプロイ開始'
+          action_url: ${{ inputs.action_url }}
+          message: ${{ steps.env_message.outputs.message }}
+          status: 'started'
+
+      - name: Extract thread timestamp
+        id: extract_ts
+        run: |
+          # Slack APIレスポンスからthread_tsを抽出する処理
+          # 実際の実装では、Slackのレスポンスを解析してthread_tsを取得
+          echo "thread_ts=$(date +%s).000000" >> $GITHUB_OUTPUT

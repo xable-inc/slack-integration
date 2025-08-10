@@ -1,0 +1,166 @@
+name: 'Slack Notification'
+description: 'Send structured Slack notifications'
+author: 'Xable'
+
+inputs:
+  webhook_url:
+    description: 'Slack Webhook URL'
+    required: true
+  user_id:
+    description: 'GitHub user ID (for mention mapping)'
+    required: false
+    default: ${{ github.event.pull_request.user.login || github.actor }}
+  project_name:
+    description: 'プロジェクト名'
+    required: true
+  pr_title:
+    description: 'PRタイトル'
+    required: false
+    default: ${{ github.event.pull_request.title }}
+  pr_url:
+    description: 'PR URL'
+    required: false
+    default: ${{ github.event.pull_request.html_url }}
+  workflow_action:
+    description: 'ワークフローアクション名'
+    required: false
+    default: ${{ github.workflow }}
+  action_url:
+    description: 'ワークフローアクション URL'
+    required: false
+    default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  message:
+    description: 'セリフ/メッセージ'
+    required: false
+    default: ''
+  status:
+    description: '結果 (success/failure/cancelled/started)'
+    required: true
+  thread_ts:
+    description: 'Slackスレッドタイムスタンプ（返信用）'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Map GitHub user to Slack user
+      id: user_mapping
+      shell: bash
+      run: |
+        case "${{ inputs.user_id }}" in
+          "c-markz")
+            echo "slack_user=<@Mark Takada>" >> $GITHUB_OUTPUT
+            ;;
+          # 他のユーザーマッピングをここに追加
+          *)
+            echo "slack_user=${{ inputs.user_id }}" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+
+    - name: Generate status message
+      id: status_message
+      shell: bash
+      run: |
+        case "${{ inputs.status }}" in
+          "success")
+            echo "color=good" >> $GITHUB_OUTPUT
+            echo "status_text=✅ 成功" >> $GITHUB_OUTPUT
+            ;;
+          "failure")
+            echo "color=danger" >> $GITHUB_OUTPUT
+            echo "status_text=❌ 失敗" >> $GITHUB_OUTPUT
+            ;;
+          "cancelled")
+            echo "color=warning" >> $GITHUB_OUTPUT
+            echo "status_text=⏹️ キャンセル" >> $GITHUB_OUTPUT
+            ;;
+          "started")
+            echo "color=#0099ff" >> $GITHUB_OUTPUT
+            echo "status_text=🚀 開始" >> $GITHUB_OUTPUT
+            ;;
+          *)
+            echo "color=#808080" >> $GITHUB_OUTPUT
+            echo "status_text=📋 ${{ inputs.status }}" >> $GITHUB_OUTPUT
+            ;;
+        esac
+
+    - name: Send Slack notification
+      shell: bash
+      run: |
+        # Slackブロック構造でメッセージを構築
+        cat << 'EOF' > payload.json
+        {
+        EOF
+
+        # スレッドタイムスタンプがある場合は追加
+        if [ -n "${{ inputs.thread_ts }}" ]; then
+          echo '"thread_ts": "${{ inputs.thread_ts }}",' >> payload.json
+        fi
+
+        cat << 'EOF' >> payload.json
+          "attachments": [
+            {
+              "color": "${{ steps.status_message.outputs.color }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "${{ inputs.project_name }} - ${{ steps.status_message.outputs.status_text }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*担当者:*\n${{ steps.user_mapping.outputs.slack_user }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*ワークフロー:*\n<${{ inputs.action_url }}|${{ inputs.workflow_action }}>"
+                    }
+                  ]
+                }
+        EOF
+
+        # PRタイトルとリンクがある場合は追加
+        if [ -n "${{ inputs.pr_title }}" ] && [ -n "${{ inputs.pr_url }}" ]; then
+          cat << 'EOF' >> payload.json
+                ,{
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR:* <${{ inputs.pr_url }}|${{ inputs.pr_title }}>"
+                  }
+                }
+        EOF
+        fi
+
+        # メッセージがある場合は追加
+        if [ -n "${{ inputs.message }}" ]; then
+          cat << 'EOF' >> payload.json
+                ,{
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ inputs.message }}"
+                  }
+                }
+        EOF
+        fi
+
+        # JSONを閉じる
+        cat << 'EOF' >> payload.json
+              ]
+            }
+          ]
+        }
+        EOF
+
+        # Slackに送信
+        curl -X POST -H 'Content-type: application/json' \
+          --data @payload.json \
+          "${{ inputs.webhook_url }}"

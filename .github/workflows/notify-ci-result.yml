@@ -1,0 +1,55 @@
+name: 'CI Result Slack Notification'
+
+on:
+  workflow_call:
+    inputs:
+      webhook_url:
+        description: 'Slack Webhook URL'
+        required: true
+        type: string
+      status:
+        description: 'CI結果 (success/failure/cancelled)'
+        required: true
+        type: string
+      project_name:
+        description: 'プロジェクト名'
+        required: true
+        type: string
+      action_url:
+        description: '実行アクションのURL'
+        required: false
+        type: string
+        default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      commit_message:
+        description: 'コミットメッセージ'
+        required: false
+        type: string
+        default: ${{ github.event.pull_request.title }}
+      author:
+        description: 'PR作成者'
+        required: false
+        type: string
+        default: ${{ github.event.pull_request.user.login }}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout slack-integration
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/slack-integration
+          path: slack-integration
+
+      - name: Send CI result notification
+        uses: ./slack-integration/.github/actions/slack-notify
+        with:
+          webhook_url: ${{ inputs.webhook_url }}
+          user_id: ${{ inputs.author }}
+          project_name: ${{ inputs.project_name }}
+          pr_title: ${{ inputs.commit_message }}
+          pr_url: ${{ github.event.pull_request.html_url }}
+          workflow_action: 'CI検証'
+          action_url: ${{ inputs.action_url }}
+          message: 'CI結果をお知らせします'
+          status: ${{ inputs.status }}
