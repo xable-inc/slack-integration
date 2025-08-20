@@ -4,8 +4,16 @@ on:
   workflow_call:
     inputs:
       webhook_url:
-        description: 'Slack Webhook URL'
-        required: true
+        description: 'Slack Webhook URL (deprecated: use bot_token + channel_id instead)'
+        required: false
+        type: string
+      bot_token:
+        description: 'Slack Bot Token (xoxb-...)'
+        required: false
+        type: string
+      channel_id:
+        description: 'Slack Channel ID (C...)'
+        required: false
         type: string
       status:
         description: 'CI結果 (success/failure/cancelled)'
@@ -51,6 +59,8 @@ jobs:
         uses: ./slack-integration/.github/actions/slack-notify
         with:
           webhook_url: ${{ inputs.webhook_url }}
+          bot_token: ${{ inputs.bot_token }}
+          channel_id: ${{ inputs.channel_id }}
           user_id: ${{ inputs.author }}
           project_name: ${{ inputs.project_name }}
           pr_title: ${{ inputs.commit_message }}

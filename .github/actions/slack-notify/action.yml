@@ -4,8 +4,14 @@ author: 'Xable'
 
 inputs:
   webhook_url:
-    description: 'Slack Webhook URL'
-    required: true
+    description: 'Slack Webhook URL (deprecated: use bot_token + channel_id instead)'
+    required: false
+  bot_token:
+    description: 'Slack Bot Token (xoxb-...)'
+    required: false
+  channel_id:
+    description: 'Slack Channel ID (C...)'
+    required: false
   user_id:
     description: 'GitHub user ID (for mention mapping)'
     required: false
@@ -40,6 +46,11 @@ inputs:
     description: 'Slackスレッドタイムスタンプ（返信用）'
     required: false
     default: ''
+
+outputs:
+  thread_ts:
+    description: 'Posted message timestamp (for thread replies)'
+    value: ${{ steps.send_notification.outputs.thread_ts }}
 
 runs:
   using: 'composite'
@@ -87,6 +98,7 @@ runs:
         esac
 
     - name: Send Slack notification
+      id: send_notification
       shell: bash
       run: |
         # Slackブロック構造でメッセージを構築
@@ -161,6 +173,34 @@ runs:
         EOF
 
         # Slackに送信
-        curl -X POST -H 'Content-type: application/json' \
-          --data @payload.json \
-          "${{ inputs.webhook_url }}"
+        if [ -n "${{ inputs.bot_token }}" ] && [ -n "${{ inputs.channel_id }}" ]; then
+          # Web API を使用（スレッド返信対応）
+          response=$(curl -s -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer ${{ inputs.bot_token }}" \
+            -H "Content-type: application/json" \
+            --data "{
+              \"channel\": \"${{ inputs.channel_id }}\",
+              $([ -n \"${{ inputs.thread_ts }}\" ] && echo \"\\\"thread_ts\\\": \\\"${{ inputs.thread_ts }}\\\",\")
+              \"attachments\": $(cat payload.json | jq '.attachments')
+            }")
+          
+          # thread_tsを抽出して出力
+          thread_ts=$(echo "$response" | jq -r '.ts // empty')
+          if [ -n "$thread_ts" ]; then
+            echo "thread_ts=$thread_ts" >> $GITHUB_OUTPUT
+          fi
+          
+          # エラーチェック
+          if [ "$(echo \"$response\" | jq -r '.ok')" != "true" ]; then
+            echo "Error: $(echo \"$response\" | jq -r '.error')" >&2
+            exit 1
+          fi
+        elif [ -n "${{ inputs.webhook_url }}" ]; then
+          # 従来のWebhook方式（後方互換性）
+          curl -X POST -H 'Content-type: application/json' \
+            --data @payload.json \
+            "${{ inputs.webhook_url }}"
+        else
+          echo "Error: Either webhook_url or (bot_token + channel_id) must be provided" >&2
+          exit 1
+        fi

@@ -4,8 +4,16 @@ on:
   workflow_call:
     inputs:
       webhook_url:
-        description: 'Slack Webhook URL'
-        required: true
+        description: 'Slack Webhook URL (deprecated: use bot_token + channel_id instead)'
+        required: false
+        type: string
+      bot_token:
+        description: 'Slack Bot Token (xoxb-...)'
+        required: false
+        type: string
+      channel_id:
+        description: 'Slack Channel ID (C...)'
+        required: false
         type: string
       project_name:
         description: 'プロジェクト名'
@@ -50,7 +58,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
     outputs:
-      thread_ts: ${{ steps.slack_response.outputs.thread_ts }}
+      thread_ts: ${{ steps.slack.outputs.thread_ts }}
     steps:
       - name: Checkout slack-integration
         uses: actions/checkout@v4
@@ -77,10 +85,12 @@ jobs:
           esac
 
       - name: Send deploy start notification
-        id: slack_response
+        id: slack
         uses: ./slack-integration/.github/actions/slack-notify
         with:
           webhook_url: ${{ inputs.webhook_url }}
+          bot_token: ${{ inputs.bot_token }}
+          channel_id: ${{ inputs.channel_id }}
           user_id: ${{ inputs.author }}
           project_name: '${{ inputs.project_name }} (${{ steps.env_message.outputs.env_text }})'
           pr_title: ${{ inputs.pr_title }}
@@ -89,10 +99,3 @@ jobs:
           action_url: ${{ inputs.action_url }}
           message: ${{ steps.env_message.outputs.message }}
           status: 'started'
-
-      - name: Extract thread timestamp
-        id: extract_ts
-        run: |
-          # Slack APIレスポンスからthread_tsを抽出する処理
-          # 実際の実装では、Slackのレスポンスを解析してthread_tsを取得
-          echo "thread_ts=$(date +%s).000000" >> $GITHUB_OUTPUT

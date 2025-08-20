@@ -11,11 +11,40 @@
 
 ## セットアップ
 
-### 1. Slack Webhook URLの準備
+### 方法1: Slack Web API（スレッド返信対応）
+
+#### 1. Slack Appの作成
+1. https://api.slack.com/apps にアクセス
+2. 「Create New App」→「From scratch」を選択
+3. App名を入力（例：GitHub Actions Bot）
+4. ワークスペースを選択して「Create App」
+
+#### 2. 権限の設定
+1. 左メニューの「OAuth & Permissions」をクリック
+2. 「Bot Token Scopes」で以下を追加：
+   - `chat:write` （メッセージ送信用）
+   - `chat:write.public` （パブリックチャンネルへの投稿用）
+
+#### 3. ワークスペースへインストール
+1. 「Install to Workspace」をクリック
+2. 権限を確認して「許可する」
+3. 表示される「Bot User OAuth Token」をコピー（`xoxb-`で始まる）
+
+#### 4. チャンネルIDの取得
+1. Slackで投稿したいチャンネルを右クリック
+2. 「チャンネル詳細を表示」→ 最下部の「チャンネルID」をコピー（例：`C05XXXXXX`）
+
+#### 5. GitHubシークレットの設定
+```
+SLACK_BOT_TOKEN: xoxb-xxxxx... （Slack Appから取得）
+SLACK_CHANNEL_ID: C05XXXXXX     （投稿先チャンネルID）
+```
+
+### 方法2: Slack Webhook URL（従来の方式）
 Slackアプリを作成し、Incoming WebhookのURLを取得してください。
 
-### 2. GitHubシークレットの設定
-プロジェクトの設定で以下のシークレットを追加：
+**注意**: Webhook URLではスレッド返信機能は使用できません。
+
 ```
 SLACK_WEBHOOK_URL: your_slack_webhook_url_here
 ```
@@ -65,8 +94,13 @@ jobs:
     needs: [test]
     if: always()
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-ci-result.yml@v1
+    secrets: inherit
     with:
-      webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      # 新しい方式（スレッド返信対応）
+      bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+      channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
+      # または従来のWebhook方式
+      # webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
       status: ${{ needs.test.result }}
       project_name: "MyProject"
       commit_message: ${{ github.event.head_commit.message || github.event.pull_request.title }}
@@ -74,9 +108,9 @@ jobs:
       action_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 ```
 
-### デプロイ開始通知
+### デプロイ通知（スレッド返信対応）
 
-デプロイワークフローの開始時：
+デプロイワークフロー：
 
 ```yaml
 name: Deploy
@@ -97,19 +131,19 @@ on:
 
 jobs:
   notify-start:
-    runs-on: ubuntu-latest
-    outputs:
-      thread_ts: ${{ steps.slack.outputs.thread_ts }}
-    steps:
-      - name: Notify deploy start
-        id: slack
-        uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-deploy-start.yml@v1
-        with:
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          project_name: "MyProject"
-          environment: ${{ github.event.inputs.environment || 'development' }}
-          pr_title: ${{ github.event.head_commit.message }}
-          author: ${{ github.actor }}
+    uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-deploy-start.yml@v1
+    secrets: inherit
+    with:
+      # 新しい方式（スレッド返信対応）
+      bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+      channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
+      # または従来のWebhook方式
+      # webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      project_name: "MyProject"
+      environment: ${{ github.event.inputs.environment || 'development' }}
+      pr_title: ${{ github.event.head_commit.message }}
+      author: ${{ github.actor }}
+      action_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   deploy:
     needs: [notify-start]
@@ -123,13 +157,19 @@ jobs:
     needs: [notify-start, deploy]
     if: always()
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-deploy-result.yml@v1
+    secrets: inherit
     with:
-      webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      # 新しい方式（スレッド返信対応）
+      bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+      channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
+      # または従来のWebhook方式
+      # webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
       status: ${{ needs.deploy.result }}
       project_name: "MyProject"
       environment: ${{ github.event.inputs.environment || 'development' }}
-      thread_ts: ${{ needs.notify-start.outputs.thread_ts }}
+      thread_ts: ${{ needs.notify-start.outputs.thread_ts }}  # 自動的にスレッド返信になる
       author: ${{ github.actor }}
+      action_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 ```
 
 ## パラメータ詳細
@@ -138,18 +178,24 @@ jobs:
 
 | パラメータ | 必須 | デフォルト値 | 説明 |
 |-----------|------|-------------|------|
-| webhook_url | ✅ | - | Slack Webhook URL |
+| webhook_url | ❌* | - | Slack Webhook URL（廃止予定） |
+| bot_token | ❌* | - | Slack Bot Token（推奨） |
+| channel_id | ❌* | - | Slack Channel ID（推奨） |
 | status | ✅ | - | CI結果 (success/failure/cancelled) |
 | project_name | ✅ | - | プロジェクト名 |
 | action_url | ❌ | 現在のワークフローURL | 実行アクションのURL |
 | commit_message | ❌ | PR title | コミットメッセージ |
 | author | ❌ | github.actor | PR作成者 |
 
+*webhook_urlまたは(bot_token + channel_id)のいずれかが必須
+
 ### notify-deploy-start.yml
 
 | パラメータ | 必須 | デフォルト値 | 説明 |
 |-----------|------|-------------|------|
-| webhook_url | ✅ | - | Slack Webhook URL |
+| webhook_url | ❌* | - | Slack Webhook URL（廃止予定） |
+| bot_token | ❌* | - | Slack Bot Token（推奨） |
+| channel_id | ❌* | - | Slack Channel ID（推奨） |
 | project_name | ✅ | - | プロジェクト名 |
 | environment | ✅ | - | デプロイ環境 (development/production) |
 | pr_title | ❌ | PR title | PRタイトル |
@@ -157,14 +203,18 @@ jobs:
 | author | ❌ | github.actor | デプロイ実行者 |
 | action_url | ❌ | 現在のワークフローURL | 実行アクションのURL |
 
+*webhook_urlまたは(bot_token + channel_id)のいずれかが必須
+
 **出力:**
-- `thread_ts`: Slackスレッドタイムスタンプ（結果通知で使用）
+- `thread_ts`: Slackスレッドタイムスタンプ（結果通知で使用、Web API使用時のみ）
 
 ### notify-deploy-result.yml
 
 | パラメータ | 必須 | デフォルト値 | 説明 |
 |-----------|------|-------------|------|
-| webhook_url | ✅ | - | Slack Webhook URL |
+| webhook_url | ❌* | - | Slack Webhook URL（廃止予定） |
+| bot_token | ❌* | - | Slack Bot Token（推奨） |
+| channel_id | ❌* | - | Slack Channel ID（推奨） |
 | status | ✅ | - | デプロイ結果 (success/failure/cancelled) |
 | project_name | ✅ | - | プロジェクト名 |
 | environment | ✅ | - | デプロイ環境 |
@@ -173,6 +223,8 @@ jobs:
 | pr_url | ❌ | PR URL | PR URL |
 | author | ❌ | github.actor | デプロイ実行者 |
 | action_url | ❌ | 現在のワークフローURL | 実行アクションのURL |
+
+*webhook_urlまたは(bot_token + channel_id)のいずれかが必須
 
 ## ユーザーマッピング
 
@@ -273,5 +325,7 @@ updates:
 - SlackユーザーIDの形式: `<@U1234567890>`
 
 ### スレッド返信が機能しない
+- **Webhook URLではスレッド返信は使用できません** - Bot Token + Channel IDを使用してください
 - デプロイ開始通知の`thread_ts`出力が正しく渡されているか確認
 - `needs`依存関係が正しく設定されているか確認
+- `secrets: inherit`が設定されているか確認
