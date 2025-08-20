@@ -4,8 +4,16 @@ on:
   workflow_call:
     inputs:
       webhook_url:
-        description: 'Slack Webhook URL'
-        required: true
+        description: 'Slack Webhook URL (deprecated: use bot_token + channel_id instead)'
+        required: false
+        type: string
+      bot_token:
+        description: 'Slack Bot Token (xoxb-...)'
+        required: false
+        type: string
+      channel_id:
+        description: 'Slack Channel ID (C...)'
+        required: false
         type: string
       status:
         description: 'デプロイ結果 (success/failure/cancelled)'
@@ -89,7 +97,7 @@ jobs:
               message="📋 ${env_text}へのデプロイ: ${{ inputs.status }}"
               ;;
           esac
-          
+
           echo "env_text=${env_text}" >> $GITHUB_OUTPUT
           echo "message=${message}" >> $GITHUB_OUTPUT
 
@@ -97,6 +105,8 @@ jobs:
         uses: ./slack-integration/.github/actions/slack-notify
         with:
           webhook_url: ${{ inputs.webhook_url }}
+          bot_token: ${{ inputs.bot_token }}
+          channel_id: ${{ inputs.channel_id }}
           user_id: ${{ inputs.author }}
           project_name: '${{ inputs.project_name }} (${{ steps.result_message.outputs.env_text }})'
           pr_title: ${{ inputs.pr_title }}
