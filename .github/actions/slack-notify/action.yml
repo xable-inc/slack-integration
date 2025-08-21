@@ -153,15 +153,19 @@ runs:
 
         # メッセージがある場合は追加
         if [ -n "${{ inputs.message }}" ]; then
+          # メッセージ内の改行をJSONで正しくエスケープ
+          message=$(echo '${{ inputs.message }}' | sed 's/\\n/\\\\n/g' | sed 's/"/\\"/g')
           cat << 'EOF' >> payload.json
                 ,{
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ inputs.message }}"
+                    "text": "MESSAGE_PLACEHOLDER"
                   }
                 }
         EOF
+          # メッセージを置換
+          sed -i "s/MESSAGE_PLACEHOLDER/$message/" payload.json
         fi
 
         # JSONを閉じる
@@ -183,13 +187,13 @@ runs:
               $([ -n \"${{ inputs.thread_ts }}\" ] && echo \"\\\"thread_ts\\\": \\\"${{ inputs.thread_ts }}\\\",\")
               \"attachments\": $(cat payload.json | jq '.attachments')
             }")
-          
+
           # thread_tsを抽出して出力
           thread_ts=$(echo "$response" | jq -r '.ts // empty')
           if [ -n "$thread_ts" ]; then
             echo "thread_ts=$thread_ts" >> $GITHUB_OUTPUT
           fi
-          
+
           # エラーチェック
           if [ "$(echo \"$response\" | jq -r '.ok')" != "true" ]; then
             echo "Error: $(echo \"$response\" | jq -r '.error')" >&2
