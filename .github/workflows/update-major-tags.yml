@@ -1,0 +1,62 @@
+name: Update Major Version Tags
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-tags:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update major version tag
+        id: update
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          
+          # セマンティックバージョニング形式（vX.Y.Z）を厳密にチェック
+          if [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            # メジャーバージョンを抽出（v1.2.3 -> v1, v2.0.0 -> v2）
+            MAJOR_TAG="v${BASH_REMATCH[1]}"
+            
+            echo "✅ Valid semantic version detected: $TAG"
+            echo "Updating major version tag: $MAJOR_TAG -> $TAG"
+            git tag -f $MAJOR_TAG
+            git push origin $MAJOR_TAG --force
+          else
+            echo "❌ ERROR: Tag '$TAG' does not match required semantic versioning format (vX.Y.Z)"
+            echo "Expected format: v1.0.0, v2.1.3, etc."
+            echo "Please create a release with proper semantic versioning."
+            echo "invalid_tag=$TAG" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  notify-error:
+    needs: update-tags
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout slack-integration
+        uses: actions/checkout@v4
+
+      - name: Send error notification
+        uses: ./.github/actions/slack-notify
+        with:
+          bot_token: ${{ vars.SLACK_BOT_TOKEN }}
+          channel_id: ${{ vars.SLACK_CHANNEL_ID }}
+          project_name: "slack-integration"
+          workflow_action: "リリースタグ更新"
+          action_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          message: |
+            ⚠️ リリースタグの形式が不正です
+            \n
+            *エラー内容:*
+            リリースタグが必須のセマンティックバージョニング形式（vX.Y.Z）に従っていません。
+            \n
+            *対象タグ:* ${{ github.ref_name }}
+            *期待される形式:* v1.0.0, v2.1.3 など
+            \n
+            正しい形式でリリースを作り直してください。
+          status: "failure"
