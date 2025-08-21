@@ -16,6 +16,13 @@ jobs:
       - name: Update major version tag
         id: update
         run: |
+          # Git設定
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # リモートURLにトークンを含める
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
           TAG=${GITHUB_REF#refs/tags/}
 
           # セマンティックバージョニング形式（vX.Y.Z）を厳密にチェック
