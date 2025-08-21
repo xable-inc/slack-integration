@@ -7,6 +7,8 @@ on:
 jobs:
   update-tags:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,12 +17,12 @@ jobs:
         id: update
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          
+
           # セマンティックバージョニング形式（vX.Y.Z）を厳密にチェック
           if [[ $TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             # メジャーバージョンを抽出（v1.2.3 -> v1, v2.0.0 -> v2）
             MAJOR_TAG="v${BASH_REMATCH[1]}"
-            
+
             echo "✅ Valid semantic version detected: $TAG"
             echo "Updating major version tag: $MAJOR_TAG -> $TAG"
             git tag -f $MAJOR_TAG
