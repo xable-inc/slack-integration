@@ -205,6 +205,6 @@ runs:
             --data @payload.json \
             "${{ inputs.webhook_url }}"
         else
-          echo "Error: Either webhook_url or (bot_token + channel_id) must be provided" >&2
+          echo "Error: bot_token and channel_id must be provided" >&2
           exit 1
         fi
