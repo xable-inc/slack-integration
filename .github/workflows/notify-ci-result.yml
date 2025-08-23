@@ -3,10 +3,6 @@ name: 'CI Result Slack Notification'
 on:
   workflow_call:
     inputs:
-      webhook_url:
-        description: 'Slack Webhook URL (deprecated: use bot_token + channel_id instead)'
-        required: false
-        type: string
       bot_token:
         description: 'Slack Bot Token (xoxb-...)'
         required: false
@@ -58,7 +54,6 @@ jobs:
       - name: Send CI result notification
         uses: ./slack-integration/.github/actions/slack-notify
         with:
-          webhook_url: ${{ inputs.webhook_url }}
           bot_token: ${{ inputs.bot_token }}
           channel_id: ${{ inputs.channel_id }}
           user_id: ${{ inputs.author }}

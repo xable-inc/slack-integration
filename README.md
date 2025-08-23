@@ -11,7 +11,7 @@
 
 ## セットアップ
 
-### 方法1: Slack Web API（スレッド返信対応）
+### セットアップ手順
 
 #### 1. Slack Appの作成
 1. https://api.slack.com/apps にアクセス
@@ -40,14 +40,6 @@ SLACK_BOT_TOKEN: xoxb-xxxxx... （Slack Appから取得）
 SLACK_CHANNEL_ID: C05XXXXXX     （投稿先チャンネルID）
 ```
 
-### 方法2: Slack Webhook URL（従来の方式）
-Slackアプリを作成し、Incoming WebhookのURLを取得してください。
-
-**注意**: Webhook URLではスレッド返信機能は使用できません。
-
-```
-SLACK_WEBHOOK_URL: your_slack_webhook_url_here
-```
 
 ## バージョン指定について
 
@@ -96,11 +88,8 @@ jobs:
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-ci-result.yml@v1
     secrets: inherit
     with:
-      # 新しい方式（スレッド返信対応）
       bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
       channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
-      # または従来のWebhook方式
-      # webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
       status: ${{ needs.test.result }}
       project_name: "MyProject"
       commit_message: ${{ github.event.head_commit.message || github.event.pull_request.title }}
@@ -134,11 +123,8 @@ jobs:
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-deploy-start.yml@v1
     secrets: inherit
     with:
-      # 新しい方式（スレッド返信対応）
       bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
       channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
-      # または従来のWebhook方式
-      # webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
       project_name: "MyProject"
       environment: ${{ github.event.inputs.environment || 'development' }}
       pr_title: ${{ github.event.head_commit.message }}
@@ -159,11 +145,8 @@ jobs:
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-deploy-result.yml@v1
     secrets: inherit
     with:
-      # 新しい方式（スレッド返信対応）
       bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
       channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
-      # または従来のWebhook方式
-      # webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
       status: ${{ needs.deploy.result }}
       project_name: "MyProject"
       environment: ${{ github.event.inputs.environment || 'development' }}
@@ -178,7 +161,6 @@ jobs:
 
 | パラメータ | 必須 | デフォルト値 | 説明 |
 |-----------|------|-------------|------|
-| webhook_url | ❌* | - | Slack Webhook URL（廃止予定） |
 | bot_token | ❌* | - | Slack Bot Token（推奨） |
 | channel_id | ❌* | - | Slack Channel ID（推奨） |
 | status | ✅ | - | CI結果 (success/failure/cancelled) |
@@ -187,13 +169,12 @@ jobs:
 | commit_message | ❌ | PR title | コミットメッセージ |
 | author | ❌ | github.actor | PR作成者 |
 
-*webhook_urlまたは(bot_token + channel_id)のいずれかが必須
+bot_token + channel_idが必須
 
 ### notify-deploy-start.yml
 
 | パラメータ | 必須 | デフォルト値 | 説明 |
 |-----------|------|-------------|------|
-| webhook_url | ❌* | - | Slack Webhook URL（廃止予定） |
 | bot_token | ❌* | - | Slack Bot Token（推奨） |
 | channel_id | ❌* | - | Slack Channel ID（推奨） |
 | project_name | ✅ | - | プロジェクト名 |
@@ -203,7 +184,7 @@ jobs:
 | author | ❌ | github.actor | デプロイ実行者 |
 | action_url | ❌ | 現在のワークフローURL | 実行アクションのURL |
 
-*webhook_urlまたは(bot_token + channel_id)のいずれかが必須
+bot_token + channel_idが必須
 
 **出力:**
 - `thread_ts`: Slackスレッドタイムスタンプ（結果通知で使用、Web API使用時のみ）
@@ -212,7 +193,6 @@ jobs:
 
 | パラメータ | 必須 | デフォルト値 | 説明 |
 |-----------|------|-------------|------|
-| webhook_url | ❌* | - | Slack Webhook URL（廃止予定） |
 | bot_token | ❌* | - | Slack Bot Token（推奨） |
 | channel_id | ❌* | - | Slack Channel ID（推奨） |
 | status | ✅ | - | デプロイ結果 (success/failure/cancelled) |
@@ -224,7 +204,7 @@ jobs:
 | author | ❌ | github.actor | デプロイ実行者 |
 | action_url | ❌ | 現在のワークフローURL | 実行アクションのURL |
 
-*webhook_urlまたは(bot_token + channel_id)のいずれかが必須
+bot_token + channel_idが必須
 
 ## ユーザーマッピング
 
