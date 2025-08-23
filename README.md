@@ -88,8 +88,8 @@ jobs:
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-ci-result.yml@v1
     secrets: inherit
     with:
-      bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-      channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
+      bot_token: ${{ vars.SLACK_BOT_TOKEN }}
+      channel_id: ${{ vars.SLACK_CHANNEL_ID }}
       status: ${{ needs.test.result }}
       project_name: "MyProject"
       commit_message: ${{ github.event.head_commit.message || github.event.pull_request.title }}
@@ -123,8 +123,8 @@ jobs:
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-deploy-start.yml@v1
     secrets: inherit
     with:
-      bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-      channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
+      bot_token: ${{ vars.SLACK_BOT_TOKEN }}
+      channel_id: ${{ vars.SLACK_CHANNEL_ID }}
       project_name: "MyProject"
       environment: ${{ github.event.inputs.environment || 'development' }}
       pr_title: ${{ github.event.head_commit.message }}
@@ -145,8 +145,8 @@ jobs:
     uses: {ORGANIZATION}/slack-integration/.github/workflows/notify-deploy-result.yml@v1
     secrets: inherit
     with:
-      bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-      channel_id: ${{ secrets.SLACK_CHANNEL_ID }}
+      bot_token: ${{ vars.SLACK_BOT_TOKEN }}
+      channel_id: ${{ vars.SLACK_CHANNEL_ID }}
       status: ${{ needs.deploy.result }}
       project_name: "MyProject"
       environment: ${{ github.event.inputs.environment || 'development' }}
