@@ -101,28 +101,33 @@ runs:
         # jqを使用してJSONを安全に構築
 
         # 基本的なブロック配列を作成
-        blocks='[
-          {
-            "type": "header",
-            "text": {
-              "type": "plain_text",
-              "text": $project_title
-            }
-          },
-          {
-            "type": "section",
-            "fields": [
-              {
-                "type": "mrkdwn",
-                "text": ("*担当者:*\n" + $slack_user)
-              },
-              {
-                "type": "mrkdwn",
-                "text": ("*ワークフロー:*\n<" + $action_url + "|" + $workflow_action + ">")
+        blocks=$(jq -n \
+          --arg project_title "${{ inputs.project_name }} - ${{ steps.status_message.outputs.status_text }}" \
+          --arg slack_user "${{ steps.user_mapping.outputs.slack_user }}" \
+          --arg action_url "${{ inputs.action_url }}" \
+          --arg workflow_action "${{ inputs.workflow_action }}" \
+          '[
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": $project_title
               }
-            ]
-          }
-        ]'
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": ("*担当者:*\n" + $slack_user)
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": ("*ワークフロー:*\n<" + $action_url + "|" + $workflow_action + ">")
+                }
+              ]
+            }
+          ]')
 
         # PRブロックを追加
         if [ -n "${{ inputs.pr_title }}" ] && [ -n "${{ inputs.pr_url }}" ]; then
@@ -147,17 +152,12 @@ runs:
         fi
 
         # 最終的なペイロードを構築
-        payload=$(jq -n \
-          --arg project_title "${{ inputs.project_name }} - ${{ steps.status_message.outputs.status_text }}" \
-          --arg slack_user "${{ steps.user_mapping.outputs.slack_user }}" \
-          --arg action_url "${{ inputs.action_url }}" \
-          --arg workflow_action "${{ inputs.workflow_action }}" \
+        payload=$(echo "$blocks" | jq \
           --arg color "${{ steps.status_message.outputs.color }}" \
-          --argjson blocks "$blocks" \
           '{
             attachments: [{
               color: $color,
-              blocks: $blocks
+              blocks: .
             }]
           }')
 
@@ -166,14 +166,17 @@ runs:
           payload=$(echo "$payload" | jq --arg thread_ts "${{ inputs.thread_ts }}" '. + {thread_ts: $thread_ts}')
         fi
 
-        # Slackに送信
+        # Slackに送信用の最終ペイロードを構築
+        api_payload=$(echo "$payload" | jq --arg channel "${{ inputs.channel_id }}" '. + {channel: $channel}')
+        
+        if [ -n "${{ inputs.thread_ts }}" ]; then
+          api_payload=$(echo "$api_payload" | jq --arg thread_ts "${{ inputs.thread_ts }}" '. + {thread_ts: $thread_ts}')
+        fi
+
         response=$(curl -s -X POST https://slack.com/api/chat.postMessage \
           -H "Authorization: Bearer ${{ inputs.bot_token }}" \
           -H "Content-type: application/json" \
-          --data "$(echo "$payload" | jq --arg channel "${{ inputs.channel_id }}" \
-            $([ -n "${{ inputs.thread_ts }}" ] && echo "--arg thread_ts \"${{ inputs.thread_ts }}\"") \
-            '. + {channel: $channel}' \
-            $([ -n "${{ inputs.thread_ts }}" ] && echo '| . + {thread_ts: $thread_ts}'))")
+          --data "$api_payload")
 
         # レスポンスの有効性をチェック
         if [ -z "$response" ]; then
