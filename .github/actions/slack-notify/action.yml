@@ -58,7 +58,7 @@ runs:
       run: |
         case "${{ inputs.user_id }}" in
           "c-markz")
-            echo "slack_user=<@Mark Takada>" >> $GITHUB_OUTPUT
+            echo "slack_user=<@U085N4WFDPT>" >> $GITHUB_OUTPUT
             ;;
           # 他のユーザーマッピングをここに追加
           *)
@@ -168,7 +168,7 @@ runs:
 
         # Slackに送信用の最終ペイロードを構築
         api_payload=$(echo "$payload" | jq --arg channel "${{ inputs.channel_id }}" '. + {channel: $channel}')
-        
+
         if [ -n "${{ inputs.thread_ts }}" ]; then
           api_payload=$(echo "$api_payload" | jq --arg thread_ts "${{ inputs.thread_ts }}" '. + {thread_ts: $thread_ts}')
         fi
